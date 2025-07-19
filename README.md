@@ -1,50 +1,46 @@
-# Welcome to your Expo app 👋
+# ONI Radio 🎧
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Aplicación moderna de reproducción de música para Android desarrollada con **React Native + Expo**.
 
-## Get started
+## 🚀 Características
 
-1. Install dependencies
+- 🎵 Reproducción de archivos locales (MP3)
+- 📂 Listas de reproducción personalizadas
+- ⏯ Controles: reproducir / pausar / siguiente / anterior
+- 🖼 Muestra la portada del álbum
+- 🌙 Modo oscuro
+- 🔊 Reproducción en segundo plano
+- 💎 Interfaz moderna estilo Spotify
 
-   ```bash
-   npm install
-   ```
+## 🛠 Tecnologías usadas
 
-2. Start the app
+- [React Native](https://reactnative.dev/)
+- [Expo](https://expo.dev/)
+- [expo-av](https://docs.expo.dev/versions/latest/sdk/av/)
+- [React Navigation](https://reactnavigation.org/)
+- [AsyncStorage](https://react-native-async-storage.github.io/async-storage/)
 
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+## 🔧 Instalación
 
 ```bash
-npm run reset-project
+git clone https://github.com/TU_USUARIO/oni-radio.git
+cd ONI-Radio
+npm install
+npx expo start
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+> Requiere tener instalado Node.js y Expo CLI.
 
-## Learn more
+## 📂 Estructura del proyecto
 
-To learn more about developing your project with Expo, look at the following resources:
+```
+oni-radio/
+├── assets/             # Imágenes y audios
+├── components/         # Componentes reutilizables
+├── screens/            # Pantallas principales
+├── utils/              # Funciones auxiliares
+├── App.js              # Entrada principal
+└── app.json            # Configuración del proyecto Expo
+```
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+Desarrollado por Edgar Enrique Delgado Sánchez
