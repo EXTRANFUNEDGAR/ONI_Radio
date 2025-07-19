@@ -1,75 +1,121 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+// app/(tabs)/index.tsx
+import React, { useState } from 'react';
+import {
+  View,
+  Text,
+  FlatList,
+  TouchableOpacity,
+  StyleSheet,
+  Platform,
+  StatusBar,
+} from 'react-native';
+import { Audio } from 'expo-av';
+import { Ionicons } from '@expo/vector-icons';
 
-import { HelloWave } from '@/components/HelloWave';
-import ParallaxScrollView from '@/components/ParallaxScrollView';
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
+const stations = [
+  {
+    name: 'Israeli Army Radio',
+    stream: 'https://www.internet-radio.com/stations/aac/',
+  },
+  {
+    name: 'AFP Radio Philippines',
+    stream: 'http://www.ustream.tv/channel/afp-radio-live',
+  },
+];
 
-export default function HomeScreen() {
+export default function RadioScreen() {
+  const [playing, setPlaying] = useState(false);
+  const [current, setCurrent] = useState<string | null>(null);
+  const [sound, setSound] = useState<Audio.Sound | null>(null);
+
+  const playRadio = async (station: typeof stations[0]) => {
+    try {
+      if (sound) {
+        await sound.stopAsync();
+        await sound.unloadAsync();
+      }
+      const { sound: newSound } = await Audio.Sound.createAsync(
+        { uri: station.stream },
+        { shouldPlay: true }
+      );
+      setSound(newSound);
+      setCurrent(station.name);
+      setPlaying(true);
+    } catch (err) {
+      console.log('Error reproduciendo radio:', err);
+      setPlaying(false);
+    }
+  };
+
+  const stopRadio = async () => {
+    if (sound) {
+      await sound.stopAsync();
+      await sound.unloadAsync();
+      setSound(null);
+      setPlaying(false);
+      setCurrent(null);
+    }
+  };
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+    <View style={styles.container}>
+      <Text style={styles.title}>Estaciones Militares</Text>
+      <FlatList
+        data={stations}
+        keyExtractor={(item) => item.name}
+        renderItem={({ item }) => {
+          const isPlaying = current === item.name && playing;
+          return (
+            <TouchableOpacity
+              style={[styles.card, isPlaying && styles.active]}
+              onPress={() => (isPlaying ? stopRadio() : playRadio(item))}
+            >
+              <Text style={styles.name}>{item.name}</Text>
+              <Ionicons
+                name={isPlaying ? 'pause-circle' : 'play-circle'}
+                size={28}
+                color={isPlaying ? '#2efc89' : '#a6ff4d'}
+              />
+            </TouchableOpacity>
+          );
+        }}
+        contentContainerStyle={{ paddingBottom: 120 }}
+      />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
+  container: {
+    flex: 1,
+    backgroundColor: '#0b0d0f',
+    paddingHorizontal: 16,
+    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight! : 40,
+  },
+  title: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#a6ff4d',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  card: {
+    backgroundColor: '#1a1f1e',
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 12,
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    gap: 8,
+    borderColor: '#2efc89',
+    borderWidth: 1,
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+  active: {
+    backgroundColor: '#26322f',
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  name: {
+    color: '#e7f6d5',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
