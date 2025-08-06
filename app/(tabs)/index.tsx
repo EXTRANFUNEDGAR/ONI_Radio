@@ -1,86 +1,105 @@
-// app/(tabs)/index.tsx
-import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  FlatList,
-  TouchableOpacity,
-  StyleSheet,
-  Platform,
-  StatusBar,
-} from 'react-native';
+// playlists.tsx
+import React, { useEffect, useState, useRef } from 'react';
+import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity } from 'react-native';
+import * as MediaLibrary from 'expo-media-library';
 import { Audio } from 'expo-av';
+import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
-const stations = [
-  {
-    name: 'Israeli Army Radio',
-    stream: 'https://www.internet-radio.com/stations/aac/',
-  },
-  {
-    name: 'AFP Radio Philippines',
-    stream: 'http://www.ustream.tv/channel/afp-radio-live',
-  },
-];
-
 export default function RadioScreen() {
-  const [playing, setPlaying] = useState(false);
-  const [current, setCurrent] = useState<string | null>(null);
-  const [sound, setSound] = useState<Audio.Sound | null>(null);
+  const [currentSong, setCurrentSong] = useState<MediaLibrary.Asset | null>(null);
+  const [songs, setSongs] = useState<MediaLibrary.Asset[]>([]);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const soundRef = useRef<Audio.Sound | null>(null);
+  const router = useRouter();
 
-  const playRadio = async (station: typeof stations[0]) => {
-    try {
-      if (sound) {
-        await sound.stopAsync();
-        await sound.unloadAsync();
+  useEffect(() => {
+    const loadSongs = async () => {
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      if (status !== 'granted') return;
+
+      const all = await MediaLibrary.getAssetsAsync({ mediaType: 'audio', first: 1000 });
+      if (all.assets.length > 0) {
+        setSongs(all.assets);
       }
-      const { sound: newSound } = await Audio.Sound.createAsync(
-        { uri: station.stream },
-        { shouldPlay: true }
-      );
-      setSound(newSound);
-      setCurrent(station.name);
-      setPlaying(true);
-    } catch (err) {
-      console.log('Error reproduciendo radio:', err);
-      setPlaying(false);
+    };
+
+    loadSongs();
+    return () => {
+      stopRadio();
+    };
+  }, []);
+
+  const startRadio = async () => {
+    if (songs.length === 0) return;
+    setIsPlaying(true);
+    playRandomSong();
+  };
+
+  const playRandomSong = async () => {
+    const next = songs[Math.floor(Math.random() * songs.length)];
+    setCurrentSong(next);
+
+    if (soundRef.current) {
+      await soundRef.current.unloadAsync();
     }
+
+    const { sound } = await Audio.Sound.createAsync(
+      { uri: next.uri },
+      { shouldPlay: true },
+      onPlaybackStatusUpdate
+    );
+
+    soundRef.current = sound;
   };
 
   const stopRadio = async () => {
-    if (sound) {
-      await sound.stopAsync();
-      await sound.unloadAsync();
-      setSound(null);
-      setPlaying(false);
-      setCurrent(null);
+    setIsPlaying(false);
+    if (soundRef.current) {
+      await soundRef.current.stopAsync();
+      await soundRef.current.unloadAsync();
+      soundRef.current = null;
+    }
+    setCurrentSong(null);
+  };
+
+  const toggleRadio = () => {
+    if (isPlaying) {
+      stopRadio();
+    } else {
+      startRadio();
+    }
+  };
+
+  const onPlaybackStatusUpdate = (status: any) => {
+    if (status.didJustFinish && isPlaying) {
+      playRandomSong();
     }
   };
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Estaciones Militares</Text>
-      <FlatList
-        data={stations}
-        keyExtractor={(item) => item.name}
-        renderItem={({ item }) => {
-          const isPlaying = current === item.name && playing;
-          return (
-            <TouchableOpacity
-              style={[styles.card, isPlaying && styles.active]}
-              onPress={() => (isPlaying ? stopRadio() : playRadio(item))}
-            >
-              <Text style={styles.name}>{item.name}</Text>
-              <Ionicons
-                name={isPlaying ? 'pause-circle' : 'play-circle'}
-                size={28}
-                color={isPlaying ? '#2efc89' : '#a6ff4d'}
-              />
-            </TouchableOpacity>
-          );
-        }}
-        contentContainerStyle={{ paddingBottom: 120 }}
-      />
+      <Text style={styles.title}>📻 RADIO TÁCTICA</Text>
+      <Text style={styles.subtitle}>90.3 FM — ONI Radio Táctica</Text>
+
+      {currentSong ? (
+        <View style={styles.infoBox}>
+          <Text style={styles.label}>Reproduciendo:</Text>
+          <Text style={styles.song}>{currentSong.filename}</Text>
+        </View>
+      ) : (
+        <ActivityIndicator color="#90ee90" size="large" />
+      )}
+
+      
+
+      <View style={styles.buttons}>
+        <TouchableOpacity onPress={toggleRadio} style={styles.button}>
+          <Ionicons name={isPlaying ? 'power' : 'play'} size={24} color={isPlaying ? '#f55' : '#90ee90'} />
+          <Text style={styles.buttonText}>{isPlaying ? 'Apagar' : 'Encender'}</Text>
+        </TouchableOpacity>
+
+      </View>
     </View>
   );
 }
@@ -88,34 +107,64 @@ export default function RadioScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0b0d0f',
-    paddingHorizontal: 16,
-    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight! : 40,
+    backgroundColor: '#0f1f1f',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
   },
   title: {
-    fontSize: 22,
+    color: '#90ee90',
+    fontSize: 26,
     fontWeight: 'bold',
-    color: '#a6ff4d',
-    marginBottom: 20,
-    textAlign: 'center',
+    marginBottom: 8,
   },
-  card: {
-    backgroundColor: '#1a1f1e',
-    borderRadius: 8,
-    padding: 16,
-    marginBottom: 12,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  subtitle: {
+    color: '#ccc',
+    fontSize: 14,
+    marginBottom: 24,
+  },
+  infoBox: {
     alignItems: 'center',
-    borderColor: '#2efc89',
+    backgroundColor: '#1c2e2e',
+    padding: 20,
+    borderRadius: 10,
+    borderColor: '#355',
     borderWidth: 1,
   },
-  active: {
-    backgroundColor: '#26322f',
+  label: {
+    color: '#aaa',
+    fontSize: 14,
+    marginBottom: 4,
   },
-  name: {
-    color: '#e7f6d5',
-    fontSize: 16,
+  song: {
+    color: '#fff',
+    fontSize: 18,
     fontWeight: '600',
+    textAlign: 'center',
+  },
+  note: {
+    color: '#777',
+    fontSize: 12,
+    marginTop: 20,
+    fontStyle: 'italic',
+    textAlign: 'center',
+  },
+  buttons: {
+    marginTop: 30,
+    flexDirection: 'row',
+    gap: 30,
+  },
+  button: {
+    alignItems: 'center',
+    backgroundColor: '#1e2f2f',
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#355',
+  },
+  buttonText: {
+    color: 'white',
+    marginTop: 4,
+    fontSize: 12,
   },
 });
