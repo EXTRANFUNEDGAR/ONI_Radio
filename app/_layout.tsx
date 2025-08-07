@@ -1,22 +1,14 @@
+// app/_layout.tsx
 import { Slot } from 'expo-router';
-import { PaperProvider } from 'react-native-paper';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AudioProvider } from '../context/AudioContext';
-import MiniPlayer from '../components/MiniPlayer';
-import { View, StyleSheet } from 'react-native';
 
-export default function Layout() {
+export default function RootLayout() {
   return (
-    <AudioProvider>
-      <PaperProvider>
-        <View style={styles.container}>
-          <Slot />
-          <MiniPlayer />
-        </View>
-      </PaperProvider>
-    </AudioProvider>
+    <SafeAreaProvider>
+      <AudioProvider>
+        <Slot />
+      </AudioProvider>
+    </SafeAreaProvider>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1 },
-});

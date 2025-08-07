@@ -1,10 +1,9 @@
-// playlists.tsx
-import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+// playlists.tsx con estilo militar
+import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-
+import React, { useEffect, useState } from 'react';
+import { Alert, FlatList, Platform, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 export default function PlaylistsScreen() {
   const [playlists, setPlaylists] = useState<Record<string, any[]>>({});
@@ -13,10 +12,8 @@ export default function PlaylistsScreen() {
 
   useEffect(() => {
     const load = async () => {
-      
       const data = await AsyncStorage.getItem('playlists');
       setPlaylists(data ? JSON.parse(data) : {});
-      
     };
     load();
   }, []);
@@ -49,25 +46,24 @@ export default function PlaylistsScreen() {
       onPress={() => router.push(`/playlist/${encodeURIComponent(name)}`)}
     >
       <Text style={styles.name}>{name}</Text>
-<TouchableOpacity onPress={() => remove(name)}>
-  <Ionicons name="trash-outline" size={22} color="white" />
-</TouchableOpacity>
-
+      <TouchableOpacity onPress={() => remove(name)}>
+        <Ionicons name="trash-outline" size={22} color="#8fff8f" />
+      </TouchableOpacity>
     </TouchableOpacity>
   );
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Tus Listas</Text>
+      <Text style={styles.title}>LISTAS DE REPRODUCCIÓN</Text>
       <TextInput
         value={newList}
         onChangeText={setNewList}
         placeholder="Nueva lista..."
-        placeholderTextColor="#888"
+        placeholderTextColor="#6f6"
         style={styles.input}
       />
       <TouchableOpacity onPress={create} style={styles.createBtn}>
-        <Text style={styles.createText}>➕ Crear</Text>
+        <Text style={styles.createText}>CREAR LISTA</Text>
       </TouchableOpacity>
       <FlatList
         data={Object.keys(playlists)}
@@ -82,33 +78,39 @@ export default function PlaylistsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#121212',
+    backgroundColor: '#0d0d0d',
     padding: 16,
-    paddingTop: 40,
+    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 40,
   },
   title: {
     fontSize: 22,
-    color: 'white',
+    color: '#8fff8f',
     fontWeight: 'bold',
     marginBottom: 12,
+    textAlign: 'center',
+    letterSpacing: 2,
   },
   input: {
     height: 40,
     paddingHorizontal: 12,
     borderRadius: 8,
-    backgroundColor: '#1e1e1e',
-    color: 'white',
+    backgroundColor: '#1c1c1c',
+    color: '#8fff8f',
     marginBottom: 8,
+    borderColor: '#8fff8f',
+    borderWidth: 1,
   },
   createBtn: {
-    backgroundColor: '#2e2e2e',
+    backgroundColor: '#1c1c1c',
     padding: 10,
     borderRadius: 6,
     alignItems: 'center',
     marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#8fff8f',
   },
   createText: {
-    color: 'white',
+    color: '#8fff8f',
     fontWeight: 'bold',
   },
   card: {
@@ -117,16 +119,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#333',
+    borderBottomColor: '#2f2f2f',
   },
   name: {
     fontSize: 16,
-    color: 'white',
+    color: '#fff',
     flex: 1,
-  },
-  del: {
-    fontSize: 16,
-    color: 'tomato',
-    paddingHorizontal: 8,
   },
 });

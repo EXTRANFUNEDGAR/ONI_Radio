@@ -1,19 +1,18 @@
-// app/(tabs)/explore.tsx
-import React, { useEffect, useState } from 'react';
-import {
-  View,
-  Text,
-  FlatList,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  Modal,
-  Pressable,
-} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useAudio } from '../../context/AudioContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as MediaLibrary from 'expo-media-library';
+import React, { useEffect, useState } from 'react';
+import {
+  FlatList,
+  Modal,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { useAudio } from '../../context/AudioContext';
 
 export default function ExploreScreen() {
   const [songs, setSongs] = useState<{ title: string; uri: string; duration: number }[]>([]);
@@ -22,8 +21,9 @@ export default function ExploreScreen() {
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedSong, setSelectedSong] = useState<{ title: string; uri: string; duration: number } | null>(null);
   const [playlists, setPlaylists] = useState<string[]>([]);
-  const [favorites, setFavorites] = useState<string[]>([]); // solo uris
+  const [favorites, setFavorites] = useState<string[]>([]);
 
+  // Cargar canciones
   useEffect(() => {
     const loadSongs = async () => {
       const { status } = await MediaLibrary.requestPermissionsAsync();
@@ -39,15 +39,15 @@ export default function ExploreScreen() {
         uri: asset.uri,
         duration: asset.duration || 0,
       }));
+
       setSongs(data);
     };
 
-    const loadPlaylists = async () => {
-      const data = await AsyncStorage.getItem('playlists');
-      const parsed = data ? JSON.parse(data) : {};
-      setPlaylists(Object.keys(parsed));
-    };
+    loadSongs();
+  }, []);
 
+  // Cargar favoritos
+  useEffect(() => {
     const loadFavorites = async () => {
       const data = await AsyncStorage.getItem('favorites');
       const parsed = data ? JSON.parse(data) : [];
@@ -55,39 +55,63 @@ export default function ExploreScreen() {
       setFavorites(uris);
     };
 
-    loadSongs();
-    loadPlaylists();
     loadFavorites();
   }, []);
 
+  // Cargar listas solo si se abre el modal
+  useEffect(() => {
+    if (modalVisible) {
+      const loadPlaylists = async () => {
+        const data = await AsyncStorage.getItem('playlists');
+        const parsed = data ? JSON.parse(data) : {};
+        const names = Object.keys(parsed).filter((key) => Array.isArray(parsed[key]));
+        setPlaylists(names);
+      };
+
+      loadPlaylists();
+    }
+  }, [modalVisible]);
+
+  // Favoritos toggle
   const handleAddToFavorites = async (song: { title: string; uri: string; duration: number }) => {
     const data = await AsyncStorage.getItem('favorites');
     const parsed = data ? JSON.parse(data) : [];
 
     const exists = parsed.some((s: any) => s.uri === song.uri);
+    let updated;
+
     if (!exists) {
-      const updated = [...parsed, song];
-      await AsyncStorage.setItem('favorites', JSON.stringify(updated));
+      updated = [...parsed, song];
       setFavorites([...favorites, song.uri]);
-      alert('Agregada a favoritos');
     } else {
-      const updated = parsed.filter((s: any) => s.uri !== song.uri);
-      await AsyncStorage.setItem('favorites', JSON.stringify(updated));
+      updated = parsed.filter((s: any) => s.uri !== song.uri);
       setFavorites(favorites.filter((uri) => uri !== song.uri));
-      alert('Quitada de favoritos');
     }
+
+    await AsyncStorage.setItem('favorites', JSON.stringify(updated));
   };
 
+  // Agregar canción a lista seleccionada
   const handleAddToPlaylist = async (playlistName: string) => {
     if (!selectedSong) return;
+
     const data = await AsyncStorage.getItem('playlists');
     const parsed = data ? JSON.parse(data) : {};
-    parsed[playlistName].push(selectedSong);
+
+    if (!Array.isArray(parsed[playlistName])) {
+      parsed[playlistName] = [];
+    }
+
+    const alreadyInList = parsed[playlistName].some((s: any) => s.uri === selectedSong.uri);
+    if (!alreadyInList) {
+      parsed[playlistName].push(selectedSong);
+    }
+
     await AsyncStorage.setItem('playlists', JSON.stringify(parsed));
     setModalVisible(false);
-    alert(`Agregada a ${playlistName}`);
   };
 
+  // Formatear duración
   const formatDuration = (seconds: number) => {
     const min = Math.floor(seconds / 60);
     const sec = Math.floor(seconds % 60).toString().padStart(2, '0');
@@ -100,10 +124,10 @@ export default function ExploreScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Explorar</Text>
+      <Text style={styles.title}>EXPLORAR ARCHIVOS</Text>
       <TextInput
         placeholder="Buscar canción..."
-        placeholderTextColor="#888"
+        placeholderTextColor="#6f6"
         value={query}
         onChangeText={setQuery}
         style={styles.input}
@@ -125,7 +149,7 @@ export default function ExploreScreen() {
                   <Ionicons
                     name={isFav ? 'heart' : 'heart-outline'}
                     size={24}
-                    color={isFav ? 'tomato' : 'white'}
+                    color={isFav ? '#8fff8f' : 'white'}
                   />
                 </TouchableOpacity>
                 <TouchableOpacity
@@ -151,16 +175,20 @@ export default function ExploreScreen() {
       >
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Agregar a lista</Text>
-            {playlists.map((name) => (
-              <Pressable
-                key={name}
-                onPress={() => handleAddToPlaylist(name)}
-                style={styles.modalButton}
-              >
-                <Text style={styles.modalText}>{name}</Text>
-              </Pressable>
-            ))}
+            <Text style={styles.modalTitle}>AGREGAR A LISTA</Text>
+            {playlists.length === 0 ? (
+              <Text style={styles.noPlaylists}>No hay listas disponibles</Text>
+            ) : (
+              playlists.map((name) => (
+                <Pressable
+                  key={name}
+                  onPress={() => handleAddToPlaylist(name)}
+                  style={styles.modalButton}
+                >
+                  <Text style={styles.modalText}>{name}</Text>
+                </Pressable>
+              ))
+            )}
             <Pressable onPress={() => setModalVisible(false)}>
               <Text style={styles.modalCancel}>Cancelar</Text>
             </Pressable>
@@ -174,38 +202,42 @@ export default function ExploreScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#121212',
+    backgroundColor: '#0d0d0d',
     paddingHorizontal: 16,
     paddingTop: 60,
   },
   title: {
     fontSize: 22,
-    color: 'white',
+    color: '#8fff8f',
     fontWeight: 'bold',
     marginBottom: 12,
+    textAlign: 'center',
+    letterSpacing: 2,
   },
   input: {
     height: 40,
-    backgroundColor: '#1e1e1e',
+    backgroundColor: '#1c1c1c',
     borderRadius: 8,
     paddingHorizontal: 12,
-    color: 'white',
+    color: '#8fff8f',
     marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#8fff8f',
   },
   card: {
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: '#333',
+    borderBottomColor: '#2f2f2f',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
   song: {
-    color: 'white',
+    color: '#fff',
     fontSize: 16,
   },
   duration: {
-    color: '#ccc',
+    color: '#6f6',
     fontSize: 12,
   },
   modalContainer: {
@@ -215,15 +247,18 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     margin: 20,
-    backgroundColor: '#1e1e1e',
+    backgroundColor: '#1c1c1c',
     borderRadius: 8,
     padding: 20,
     alignItems: 'center',
+    borderColor: '#444',
+    borderWidth: 1,
   },
   modalTitle: {
-    color: 'white',
+    color: '#8fff8f',
     fontSize: 18,
     marginBottom: 12,
+    fontWeight: 'bold',
   },
   modalButton: {
     paddingVertical: 10,
@@ -237,6 +272,10 @@ const styles = StyleSheet.create({
   },
   modalCancel: {
     marginTop: 16,
-    color: 'tomato',
+    color: '#ff6666',
+  },
+  noPlaylists: {
+    color: '#888',
+    marginBottom: 8,
   },
 });

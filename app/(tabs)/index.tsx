@@ -1,17 +1,28 @@
-// playlists.tsx
-import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity } from 'react-native';
-import * as MediaLibrary from 'expo-media-library';
-import { Audio } from 'expo-av';
-import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Audio } from 'expo-av';
+import * as MediaLibrary from 'expo-media-library';
+import React, { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 export default function RadioScreen() {
   const [currentSong, setCurrentSong] = useState<MediaLibrary.Asset | null>(null);
   const [songs, setSongs] = useState<MediaLibrary.Asset[]>([]);
   const [isPlaying, setIsPlaying] = useState(false);
   const soundRef = useRef<Audio.Sound | null>(null);
-  const router = useRouter();
+
+  // 🔊 Configurar reproducción en segundo plano
+  useEffect(() => {
+    Audio.setAudioModeAsync({
+      allowsRecordingIOS: false,
+      staysActiveInBackground: true,
+      playsInSilentModeIOS: true,
+      interruptionModeIOS: Audio.INTERRUPTION_MODE_IOS_DO_NOT_MIX,
+      interruptionModeAndroid: Audio.INTERRUPTION_MODE_ANDROID_DO_NOT_MIX,
+      shouldDuckAndroid: true,
+      playThroughEarpieceAndroid: false,
+    });
+  }, []);
 
   useEffect(() => {
     const loadSongs = async () => {
@@ -21,23 +32,29 @@ export default function RadioScreen() {
       const all = await MediaLibrary.getAssetsAsync({ mediaType: 'audio', first: 1000 });
       if (all.assets.length > 0) {
         setSongs(all.assets);
+        const wasOn = await AsyncStorage.getItem('radioOn');
+        if (wasOn === 'true') startRadio(all.assets); // restaura la radio si estaba encendida
       }
     };
 
     loadSongs();
+
     return () => {
       stopRadio();
     };
   }, []);
 
-  const startRadio = async () => {
-    if (songs.length === 0) return;
+  const startRadio = async (customSongs?: MediaLibrary.Asset[]) => {
+    const allSongs = customSongs || songs;
+    if (allSongs.length === 0) return;
+
     setIsPlaying(true);
-    playRandomSong();
+    await AsyncStorage.setItem('radioOn', 'true');
+    playRandomSong(allSongs);
   };
 
-  const playRandomSong = async () => {
-    const next = songs[Math.floor(Math.random() * songs.length)];
+  const playRandomSong = async (songList: MediaLibrary.Asset[]) => {
+    const next = songList[Math.floor(Math.random() * songList.length)];
     setCurrentSong(next);
 
     if (soundRef.current) {
@@ -55,6 +72,7 @@ export default function RadioScreen() {
 
   const stopRadio = async () => {
     setIsPlaying(false);
+    await AsyncStorage.removeItem('radioOn');
     if (soundRef.current) {
       await soundRef.current.stopAsync();
       await soundRef.current.unloadAsync();
@@ -73,7 +91,7 @@ export default function RadioScreen() {
 
   const onPlaybackStatusUpdate = (status: any) => {
     if (status.didJustFinish && isPlaying) {
-      playRandomSong();
+      playRandomSong(songs);
     }
   };
 
@@ -91,14 +109,15 @@ export default function RadioScreen() {
         <ActivityIndicator color="#90ee90" size="large" />
       )}
 
-      
-
       <View style={styles.buttons}>
         <TouchableOpacity onPress={toggleRadio} style={styles.button}>
-          <Ionicons name={isPlaying ? 'power' : 'play'} size={24} color={isPlaying ? '#f55' : '#90ee90'} />
+          <Ionicons
+            name={isPlaying ? 'power' : 'play'}
+            size={24}
+            color={isPlaying ? '#f55' : '#90ee90'}
+          />
           <Text style={styles.buttonText}>{isPlaying ? 'Apagar' : 'Encender'}</Text>
         </TouchableOpacity>
-
       </View>
     </View>
   );
@@ -140,13 +159,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 18,
     fontWeight: '600',
-    textAlign: 'center',
-  },
-  note: {
-    color: '#777',
-    fontSize: 12,
-    marginTop: 20,
-    fontStyle: 'italic',
     textAlign: 'center',
   },
   buttons: {
