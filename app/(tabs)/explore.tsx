@@ -17,13 +17,12 @@ import { useAudio } from '../../context/AudioContext';
 export default function ExploreScreen() {
   const [songs, setSongs] = useState<{ title: string; uri: string; duration: number }[]>([]);
   const [query, setQuery] = useState('');
-  const { play } = useAudio();
+  const { play, setQueue } = useAudio();
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedSong, setSelectedSong] = useState<{ title: string; uri: string; duration: number } | null>(null);
   const [playlists, setPlaylists] = useState<string[]>([]);
   const [favorites, setFavorites] = useState<string[]>([]);
 
-  // Cargar canciones
   useEffect(() => {
     const loadSongs = async () => {
       const { status } = await MediaLibrary.requestPermissionsAsync();
@@ -41,12 +40,12 @@ export default function ExploreScreen() {
       }));
 
       setSongs(data);
+      setQueue(data); // ✅ se establece el queue global para el miniplayer
     };
 
     loadSongs();
   }, []);
 
-  // Cargar favoritos
   useEffect(() => {
     const loadFavorites = async () => {
       const data = await AsyncStorage.getItem('favorites');
@@ -58,7 +57,6 @@ export default function ExploreScreen() {
     loadFavorites();
   }, []);
 
-  // Cargar listas solo si se abre el modal
   useEffect(() => {
     if (modalVisible) {
       const loadPlaylists = async () => {
@@ -72,7 +70,6 @@ export default function ExploreScreen() {
     }
   }, [modalVisible]);
 
-  // Favoritos toggle
   const handleAddToFavorites = async (song: { title: string; uri: string; duration: number }) => {
     const data = await AsyncStorage.getItem('favorites');
     const parsed = data ? JSON.parse(data) : [];
@@ -91,7 +88,6 @@ export default function ExploreScreen() {
     await AsyncStorage.setItem('favorites', JSON.stringify(updated));
   };
 
-  // Agregar canción a lista seleccionada
   const handleAddToPlaylist = async (playlistName: string) => {
     if (!selectedSong) return;
 
@@ -111,7 +107,6 @@ export default function ExploreScreen() {
     setModalVisible(false);
   };
 
-  // Formatear duración
   const formatDuration = (seconds: number) => {
     const min = Math.floor(seconds / 60);
     const sec = Math.floor(seconds % 60).toString().padStart(2, '0');
@@ -140,7 +135,7 @@ export default function ExploreScreen() {
           const isFav = favorites.includes(item.uri);
           return (
             <View style={styles.card}>
-              <TouchableOpacity style={{ flex: 1 }} onPress={() => play(item, filtered)}>
+              <TouchableOpacity style={{ flex: 1 }} onPress={() => play(item)}>
                 <Text style={styles.song}>{item.title}</Text>
                 <Text style={styles.duration}>{formatDuration(item.duration)}</Text>
               </TouchableOpacity>

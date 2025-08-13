@@ -1,98 +1,87 @@
-// context/AudioContext.tsx
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Audio } from 'expo-av';
+import * as MediaLibrary from 'expo-media-library'; // 👈 para cargar canciones
 import React, { createContext, useContext, useEffect, useState } from 'react';
 
-interface Song {
-  title: string;
-  uri: string;
-}
+const AudioContext = createContext<any>(null);
 
-interface AudioContextProps {
-  currentSong: Song | null;
-  isPlaying: boolean;
-  play: (song: Song, playlist?: Song[], options?: { isRadio?: boolean }) => void;
-  pause: () => void;
-  queue: Song[];
-  playNext: () => void;
-  playPrevious: () => void;
-  setPlaylist: (list: Song[]) => void;
-  setCurrentSong: (s: Song) => void;
-  setIsPlaying: (p: boolean) => void;
-  sound: Audio.Sound | null;
-  isRadio: boolean;
-}
-
-const AudioContext = createContext<AudioContextProps>({} as AudioContextProps);
-
-export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [currentSong, setCurrentSong] = useState<Song | null>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [queue, setQueue] = useState<Song[]>([]);
-  const [playlist, setPlaylistState] = useState<Song[]>([]);
+export const AudioProvider = ({ children }: any) => {
   const [sound, setSound] = useState<Audio.Sound | null>(null);
-  const [isRadio, setIsRadio] = useState(false);
+  const [currentSong, setCurrentSong] = useState<any>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [queue, setQueue] = useState<any[]>([]);
 
-  // 🔊 Configurar reproducción en segundo plano
   useEffect(() => {
-    Audio.setAudioModeAsync({
-      staysActiveInBackground: true,
-      interruptionModeAndroid: Audio.INTERRUPTION_MODE_ANDROID_DO_NOT_MIX,
-      shouldDuckAndroid: true,
-      playsInSilentModeIOS: true,
-      interruptionModeIOS: Audio.INTERRUPTION_MODE_IOS_DO_NOT_MIX,
-    });
+    const setupAudio = async () => {
+      await Audio.setAudioModeAsync({
+        staysActiveInBackground: true,
+        shouldDuckAndroid: true,
+        playsInSilentModeIOS: true,
+      });
 
-    restorePlayback();
+      // Cargar canciones si aún no hay queue
+      if (queue.length === 0) {
+        const { status } = await MediaLibrary.requestPermissionsAsync();
+        if (status === 'granted') {
+          const all = await MediaLibrary.getAssetsAsync({ mediaType: 'audio', first: 1000 });
+          setQueue(all.assets);
+        }
+      }
+
+      const saved = await AsyncStorage.getItem('lastSong');
+      const wasPlaying = await AsyncStorage.getItem('wasPlaying');
+
+      if (saved) {
+        const song = JSON.parse(saved);
+        setCurrentSong(song);
+
+        if (wasPlaying === 'true') {
+          const { sound: newSound } = await Audio.Sound.createAsync(
+            { uri: song.uri },
+            { shouldPlay: true },
+            onPlaybackStatusUpdate
+          );
+          setSound(newSound);
+          setIsPlaying(true);
+        }
+      }
+    };
+
+    setupAudio();
   }, []);
 
-  const restorePlayback = async () => {
-    const saved = await AsyncStorage.getItem('lastSong');
-    const playing = await AsyncStorage.getItem('wasPlaying');
-    const wasRadio = await AsyncStorage.getItem('wasRadio');
-
-    if (!saved || playing !== 'true') return;
-
-    const parsed = JSON.parse(saved);
-    setCurrentSong(parsed);
-
-    // Solo vuelve a reproducir si no es radio (radio se gestiona aparte)
-    if (wasRadio === 'true') {
-      play(parsed, [], { isRadio: true });
-    } else {
-      play(parsed);
+  const onPlaybackStatusUpdate = (status: any) => {
+    if (status.didJustFinish) {
+      playNext();
     }
   };
 
-  const unload = async () => {
+const play = async (song: any, list: any[] = []) => {
+  try {
+    // Unload sonido anterior si existe
     if (sound) {
+      await sound.stopAsync();
       await sound.unloadAsync();
-      setSound(null);
     }
-  };
-
-  const play = async (song: Song, fullPlaylist: Song[] = [], options: { isRadio?: boolean } = {}) => {
-    if (currentSong?.uri === song.uri && isPlaying) return;
-    await unload();
 
     const { sound: newSound } = await Audio.Sound.createAsync(
       { uri: song.uri },
-      { shouldPlay: true, isLooping: options.isRadio || false }
+      { shouldPlay: true },
+      onPlaybackStatusUpdate
     );
 
     setSound(newSound);
     setCurrentSong(song);
     setIsPlaying(true);
-    setIsRadio(!!options.isRadio);
+    if (list.length > 0) setQueue(list);
 
     await AsyncStorage.setItem('lastSong', JSON.stringify(song));
     await AsyncStorage.setItem('wasPlaying', 'true');
-    await AsyncStorage.setItem('wasRadio', options.isRadio ? 'true' : 'false');
+  } catch (error) {
+    console.error('Error al reproducir:', error);
+  }
+};
 
-    if (fullPlaylist.length > 0 && !options.isRadio) {
-      setPlaylistState(fullPlaylist);
-    }
-  };
 
   const pause = async () => {
     if (sound) {
@@ -102,41 +91,45 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
-  const setPlaylist = (list: Song[]) => {
-    setPlaylistState(list);
+  const resume = async () => {
+    if (sound) {
+      await sound.playAsync();
+      setIsPlaying(true);
+      await AsyncStorage.setItem('wasPlaying', 'true');
+    }
   };
 
   const playNext = () => {
-    if (!currentSong || playlist.length === 0) return;
-    const index = playlist.findIndex((s) => s.uri === currentSong.uri);
-    if (index >= 0 && index < playlist.length - 1) {
-      play(playlist[index + 1], playlist);
-    }
+    if (!queue.length || !currentSong) return;
+    const index = queue.findIndex((s) => s.uri === currentSong.uri);
+    if (index === -1) return;
+    const next = queue[index + 1] || queue[0];
+    play(next);
   };
 
   const playPrevious = () => {
-    if (!currentSong || playlist.length === 0) return;
-    const index = playlist.findIndex((s) => s.uri === currentSong.uri);
-    if (index > 0) {
-      play(playlist[index - 1], playlist);
-    }
+    if (!queue.length || !currentSong) return;
+    const index = queue.findIndex((s) => s.uri === currentSong.uri);
+    if (index === -1) return;
+    const prev = queue[index - 1] || queue[queue.length - 1];
+    play(prev);
   };
 
   return (
     <AudioContext.Provider
       value={{
-        currentSong,
+        sound,
         isPlaying,
+        currentSong,
+        queue,
+        setQueue,
         play,
         pause,
-        queue,
+        resume,
         playNext,
         playPrevious,
-        setPlaylist,
         setCurrentSong,
         setIsPlaying,
-        sound,
-        isRadio,
       }}
     >
       {children}

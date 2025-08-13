@@ -1,9 +1,8 @@
-// MiniPlayer optimizado usando AudioContext global sin crear Audio.Sound nuevo
-import React, { useEffect, useState } from 'react';
-import { View, StyleSheet } from 'react-native';
-import { Text, IconButton, ProgressBar } from 'react-native-paper';
-import { useAudio } from '../context/AudioContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import React, { useEffect, useState } from 'react';
+import { StyleSheet, View } from 'react-native';
+import { IconButton, ProgressBar, Text } from 'react-native-paper';
+import { useAudio } from '../context/AudioContext';
 
 export default function MiniPlayer() {
   const {
@@ -11,57 +10,60 @@ export default function MiniPlayer() {
     isPlaying,
     pause,
     play,
-    queue,
     playNext,
     playPrevious,
-    setCurrentSong,
-    setIsPlaying,
     sound,
   } = useAudio();
 
   const [progress, setProgress] = useState(0);
-  const [duration, setDuration] = useState(1);
 
+  // Reset al cambiar canción
   useEffect(() => {
-    const restore = async () => {
-      const saved = await AsyncStorage.getItem('lastSong');
-      const playing = await AsyncStorage.getItem('wasPlaying');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        setCurrentSong(parsed);
-        if (playing === 'true') play(parsed);
-      }
-    };
-    restore();
-  }, []);
+    setProgress(0);
+  }, [currentSong?.uri]);
 
+  // Escuchar cambios en la reproducción
   useEffect(() => {
     if (!sound) return;
 
-    const interval = setInterval(async () => {
-      const status = await sound.getStatusAsync();
-      if (status.isLoaded) {
-        setProgress(status.positionMillis / status.durationMillis);
-        setDuration(status.durationMillis);
-      }
-    }, 500);
+    const onStatus = (status: any) => {
+      if (!status.isLoaded) return;
 
-    return () => clearInterval(interval);
-  }, [sound]);
+      const { positionMillis, durationMillis, didJustFinish } = status;
+      if (durationMillis && durationMillis > 0) {
+        setProgress(positionMillis / durationMillis);
+      }
+      if (didJustFinish) {
+        playNext?.();
+      }
+    };
+
+    // Actualizar cada 300 ms
+    sound.setProgressUpdateIntervalAsync?.(300);
+    sound.setOnPlaybackStatusUpdate(onStatus);
+
+    return () => {
+      sound.setOnPlaybackStatusUpdate(null);
+    };
+  }, [sound, playNext]);
 
   if (!currentSong) return null;
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title} numberOfLines={1}>{currentSong.title}</Text>
-      <ProgressBar progress={progress} color="white" style={styles.bar} />
+    <View style={styles.container} key={currentSong.uri}>
+      <Text style={styles.title} numberOfLines={1}>
+        {currentSong.title}
+      </Text>
+
+      {/* Barra verde militar */}
+      <ProgressBar
+        progress={progress}
+        color="#8fff8f" // relleno verde
+        style={styles.bar} // fondo oscuro
+      />
+
       <View style={styles.controls}>
-        <IconButton
-          icon="skip-previous"
-          iconColor="white"
-          size={24}
-          onPress={playPrevious}
-        />
+        <IconButton icon="skip-previous" iconColor="white" size={24} onPress={playPrevious} />
         <IconButton
           icon={isPlaying ? 'pause' : 'play'}
           iconColor="white"
@@ -71,17 +73,12 @@ export default function MiniPlayer() {
               pause();
               await AsyncStorage.setItem('wasPlaying', 'false');
             } else {
-              play(currentSong);
+              await play(currentSong);
               await AsyncStorage.setItem('wasPlaying', 'true');
             }
           }}
         />
-        <IconButton
-          icon="skip-next"
-          iconColor="white"
-          size={24}
-          onPress={playNext}
-        />
+        <IconButton icon="skip-next" iconColor="white" size={24} onPress={playNext} />
       </View>
     </View>
   );
@@ -108,6 +105,7 @@ const styles = StyleSheet.create({
     height: 4,
     borderRadius: 2,
     marginBottom: 6,
+    backgroundColor: '#1a1a1a', // fondo oscuro
   },
   controls: {
     flexDirection: 'row',

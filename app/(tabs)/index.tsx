@@ -1,28 +1,16 @@
 import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Audio } from 'expo-av';
 import * as MediaLibrary from 'expo-media-library';
 import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useAudio } from '../../context/AudioContext';
 
 export default function RadioScreen() {
-  const [currentSong, setCurrentSong] = useState<MediaLibrary.Asset | null>(null);
-  const [songs, setSongs] = useState<MediaLibrary.Asset[]>([]);
+  const [currentSong, setCurrentSong] = useState(null);
+  const [songs, setSongs] = useState([]);
   const [isPlaying, setIsPlaying] = useState(false);
   const soundRef = useRef<Audio.Sound | null>(null);
-
-  // 🔊 Configurar reproducción en segundo plano
-  useEffect(() => {
-    Audio.setAudioModeAsync({
-      allowsRecordingIOS: false,
-      staysActiveInBackground: true,
-      playsInSilentModeIOS: true,
-      interruptionModeIOS: Audio.INTERRUPTION_MODE_IOS_DO_NOT_MIX,
-      interruptionModeAndroid: Audio.INTERRUPTION_MODE_ANDROID_DO_NOT_MIX,
-      shouldDuckAndroid: true,
-      playThroughEarpieceAndroid: false,
-    });
-  }, []);
+  const { pause } = useAudio(); // detener música normal
 
   useEffect(() => {
     const loadSongs = async () => {
@@ -30,49 +18,58 @@ export default function RadioScreen() {
       if (status !== 'granted') return;
 
       const all = await MediaLibrary.getAssetsAsync({ mediaType: 'audio', first: 1000 });
-      if (all.assets.length > 0) {
-        setSongs(all.assets);
-        const wasOn = await AsyncStorage.getItem('radioOn');
-        if (wasOn === 'true') startRadio(all.assets); // restaura la radio si estaba encendida
-      }
+      if (all.assets.length > 0) setSongs(all.assets);
     };
 
     loadSongs();
-
     return () => {
       stopRadio();
     };
   }, []);
 
-  const startRadio = async (customSongs?: MediaLibrary.Asset[]) => {
-    const allSongs = customSongs || songs;
-    if (allSongs.length === 0) return;
+  const startRadio = async () => {
+    if (songs.length === 0) return;
 
+    await pause(); // detiene música normal
     setIsPlaying(true);
-    await AsyncStorage.setItem('radioOn', 'true');
-    playRandomSong(allSongs);
+    await playRandomSong();
   };
 
-  const playRandomSong = async (songList: MediaLibrary.Asset[]) => {
-    const next = songList[Math.floor(Math.random() * songList.length)];
-    setCurrentSong(next);
+const playRandomSong = async () => {
+  if (songs.length === 0) return;
 
-    if (soundRef.current) {
-      await soundRef.current.unloadAsync();
+  const next = songs[Math.floor(Math.random() * songs.length)];
+  setCurrentSong(next);
+
+  // Detener y descargar sonido anterior
+  if (soundRef.current) {
+    await soundRef.current.stopAsync();
+    await soundRef.current.unloadAsync();
+    soundRef.current = null;
+  }
+
+  const { sound } = await Audio.Sound.createAsync(
+    { uri: next.uri },
+    { shouldPlay: true }
+  );
+
+  sound.setOnPlaybackStatusUpdate(async (status) => {
+    if (status.didJustFinish) {
+      // Asegúrate que el estado isPlaying esté actualizado
+      const playing = await sound.getStatusAsync();
+      if (playing.isLoaded) {
+        playRandomSong();
+      }
     }
+  });
 
-    const { sound } = await Audio.Sound.createAsync(
-      { uri: next.uri },
-      { shouldPlay: true },
-      onPlaybackStatusUpdate
-    );
+  soundRef.current = sound;
+};
 
-    soundRef.current = sound;
-  };
+
 
   const stopRadio = async () => {
     setIsPlaying(false);
-    await AsyncStorage.removeItem('radioOn');
     if (soundRef.current) {
       await soundRef.current.stopAsync();
       await soundRef.current.unloadAsync();
@@ -89,12 +86,6 @@ export default function RadioScreen() {
     }
   };
 
-  const onPlaybackStatusUpdate = (status: any) => {
-    if (status.didJustFinish && isPlaying) {
-      playRandomSong(songs);
-    }
-  };
-
   return (
     <View style={styles.container}>
       <Text style={styles.title}>📻 RADIO TÁCTICA</Text>
@@ -106,16 +97,12 @@ export default function RadioScreen() {
           <Text style={styles.song}>{currentSong.filename}</Text>
         </View>
       ) : (
-        <ActivityIndicator color="#90ee90" size="large" />
+        isPlaying && <ActivityIndicator color="#90ee90" size="large" />
       )}
 
       <View style={styles.buttons}>
         <TouchableOpacity onPress={toggleRadio} style={styles.button}>
-          <Ionicons
-            name={isPlaying ? 'power' : 'play'}
-            size={24}
-            color={isPlaying ? '#f55' : '#90ee90'}
-          />
+          <Ionicons name={isPlaying ? 'power' : 'play'} size={24} color={isPlaying ? '#f55' : '#90ee90'} />
           <Text style={styles.buttonText}>{isPlaying ? 'Apagar' : 'Encender'}</Text>
         </TouchableOpacity>
       </View>
