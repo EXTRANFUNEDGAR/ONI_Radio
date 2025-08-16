@@ -7,10 +7,8 @@ Aplicación moderna de reproducción de música para Android desarrollada con **
 - 🎵 Reproducción de archivos locales (MP3)
 - 📂 Listas de reproducción personalizadas
 - ⏯ Controles: reproducir / pausar / siguiente / anterior
-- 🖼 Muestra la portada del álbum
 - 🌙 Modo oscuro
 - 🔊 Reproducción en segundo plano
-- 💎 Interfaz moderna estilo Spotify
 
 ## 🛠 Tecnologías usadas
 
